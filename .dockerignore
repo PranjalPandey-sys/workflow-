@@ -1,0 +1,19 @@
+# Keep the Docker build context small and make sure secrets can never end up
+# baked into an image layer by accident.
+.git
+.gitignore
+.env
+.env.local
+.env.*.local
+!.env.example
+README.md
+*.md
+.vscode/
+.idea/
+postgres_data/
+pgdata/
+.n8n/
+n8n_data/
+*.pem
+*.key
+*.p12

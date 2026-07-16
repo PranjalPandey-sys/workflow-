@@ -1,0 +1,73 @@
+# =============================================================================
+# docker-compose.yml -- LOCAL DEVELOPMENT / TESTING ONLY
+# =============================================================================
+# IMPORTANT: Render does not run docker-compose. Render builds and runs a
+# single container from ./Dockerfile (see render.yaml). This compose file
+# exists so you can run and test the exact same n8n image locally, with a
+# throwaway local Postgres, before you ever push to Render.
+#
+# It intentionally uses the SAME environment variable names as production
+# (see .env.example) so that switching from "local Postgres" to "Supabase
+# Postgres" is a one-line change in your .env file, not a rewrite.
+#
+# Usage:
+#   cp .env.example .env      # then fill in real values
+#   docker compose up -d
+#   open http://localhost:5678
+# =============================================================================
+
+services:
+  n8n:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    env_file:
+      - .env
+    environment:
+      # These two are pinned here (rather than left to .env) because in the
+      # LOCAL compose network n8n always talks to the "postgres" service by
+      # name -- Render's env vars for the same keys will point at Supabase
+      # instead. Everything else comes from your .env file.
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      # Only used if you want n8n's local file-based extras (e.g. custom
+      # binary-data storage) to survive a container recreate locally.
+      # Your actual workflow/credential data lives in Postgres, not here.
+      - n8n_local_data:/home/node/.n8n
+    networks:
+      - n8n_net
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: n8n_postgres_local
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${DB_POSTGRESDB_DATABASE:-n8n}
+      - POSTGRES_USER=${DB_POSTGRESDB_USER:-n8n}
+      - POSTGRES_PASSWORD=${DB_POSTGRESDB_PASSWORD:?set DB_POSTGRESDB_PASSWORD in .env}
+    volumes:
+      - postgres_local_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_POSTGRESDB_USER:-n8n}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - n8n_net
+
+volumes:
+  n8n_local_data:
+  postgres_local_data:
+
+networks:
+  n8n_net:
+    driver: bridge

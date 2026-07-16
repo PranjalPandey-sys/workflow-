@@ -1,0 +1,39 @@
+# =============================================================================
+# Secrets -- never commit real environment values
+# =============================================================================
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# =============================================================================
+# n8n local data (only relevant when NOT using external Postgres, e.g. quick
+# local experiments). Production data lives in Supabase, not in these paths.
+# =============================================================================
+.n8n/
+n8n_data/
+
+# =============================================================================
+# Local Postgres volume data (docker-compose local dev only)
+# =============================================================================
+postgres_data/
+pgdata/
+
+# =============================================================================
+# Credentials / keys that should never land in git under any circumstance
+# =============================================================================
+*.pem
+*.key
+*.p12
+*credentials*.json
+*service-account*.json
+
+# =============================================================================
+# OS / editor noise
+# =============================================================================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
+*.pid

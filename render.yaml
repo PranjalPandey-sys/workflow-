@@ -1,0 +1,91 @@
+# =============================================================================
+# render.yaml -- Render Blueprint
+# =============================================================================
+# This is what actually deploys on Render (docker-compose.yml above is NOT
+# used by Render). One Docker-based web service, built from ./Dockerfile.
+#
+# HOW TO USE:
+#   1. Push this repo to GitHub (see README.md for the exact commands).
+#   2. In the Render Dashboard: New > Blueprint > select this repo.
+#   3. Render reads this file and creates the service below.
+#   4. Every env var marked "sync: false" will NOT be filled in automatically
+#      -- Render will prompt you to enter it in the dashboard. This is
+#      deliberate: it is how secrets stay out of git entirely.
+#
+# PLAN CHOICE -- read before deploying:
+# We set plan: starter (paid, ~$7/mo at time of writing) instead of free.
+# Render's free web services spin down after 15 minutes of inactivity and
+# take 30-60s to cold-start on the next request. n8n's whole job here is to
+# receive webhooks (Telegram, GitHub, Gmail push, etc.) at any moment --
+# a sleeping instance means dropped/delayed webhook deliveries. If you only
+# want to kick the tires first, change plan to "free" and accept that
+# limitation temporarily; switch to starter before relying on it.
+# =============================================================================
+
+services:
+  - type: web
+    name: n8n
+    env: docker
+    plan: starter
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      # ---- Core n8n identity & networking ----------------------------------
+      - key: N8N_ENCRYPTION_KEY
+        sync: false          # generate once yourself, see README -- never regenerate after first boot
+      - key: N8N_PROTOCOL
+        value: https
+      - key: N8N_HOST
+        sync: false          # e.g. your-service-name.onrender.com, fill in after first deploy creates the URL
+      - key: N8N_PORT
+        value: "5678"
+      - key: PORT
+        value: "5678"        # Render-specific: must match N8N_PORT so Render routes to the right port
+      - key: WEBHOOK_URL
+        sync: false          # e.g. https://your-service-name.onrender.com/
+      - key: N8N_PROXY_HOPS
+        value: "1"           # Render sits in front of your container as 1 reverse-proxy hop
+      - key: N8N_SECURE_COOKIE
+        value: "true"
+      - key: GENERIC_TIMEZONE
+        sync: false          # e.g. America/New_York -- see README for how to pick this
+      - key: TZ
+        sync: false          # same value as GENERIC_TIMEZONE
+      - key: N8N_RUNNERS_ENABLED
+        value: "true"
+      - key: N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS
+        value: "true"
+
+      # ---- Database: external Postgres (Supabase) ---------------------------
+      # We deliberately do NOT use Render's own free Postgres add-on: Render's
+      # free database is auto-deleted 30 days after creation. Supabase gives
+      # you a durable Postgres that also survives moving off Render entirely.
+      - key: DB_TYPE
+        value: postgresdb
+      - key: DB_POSTGRESDB_HOST
+        sync: false
+      - key: DB_POSTGRESDB_PORT
+        value: "5432"
+      - key: DB_POSTGRESDB_DATABASE
+        sync: false
+      - key: DB_POSTGRESDB_USER
+        sync: false
+      - key: DB_POSTGRESDB_PASSWORD
+        sync: false
+      - key: DB_POSTGRESDB_SCHEMA
+        value: public
+      - key: DB_POSTGRESDB_SSL_ENABLED
+        value: "true"
+      - key: DB_POSTGRESDB_SSL_REJECT_UNAUTHORIZED
+        value: "true"
+
+      # ---- Execution data hygiene (recommended for production) -------------
+      - key: EXECUTIONS_DATA_PRUNE
+        value: "true"
+      - key: EXECUTIONS_DATA_MAX_AGE
+        value: "336"          # hours = 14 days; adjust to your compliance/debugging needs
+      - key: N8N_LOG_LEVEL
+        value: info
